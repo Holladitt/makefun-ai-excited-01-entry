@@ -25,7 +25,9 @@ It also prints a short fingerprint of the bytes written, so the copy can
 be matched to the original at a glance. v1.2 adds the pre-copy
 existence and non-empty checks plus that fingerprint line. v1.3 adds a
 writability probe of the output directory before copying, and a final
-one-line summary of input bytes versus output bytes.
+one-line summary of input bytes versus output bytes. v1.4 checks the
+image's first bytes against the JPEG/PNG magic signatures before
+copying, and names the detected format in the log line.
 
 Run it with `MAKEFUN_OUTPUT_DIR` set to the output directory (it defaults
 to `/output`); it creates the directory if needed.

@@ -1,8 +1,11 @@
-// Whale Mage — Lightning Orb, v1.3.
+// Whale Mage — Lightning Orb, v1.4.
 // Entry program for the make.fun ai-excited-01 bounty.
 // It takes the artwork file sitting beside this program, validates it,
 // places an identical copy in the output directory, and then proves the
 // copy is byte-for-byte the same by reading it back and comparing.
+// The file is named entry.png but its bytes are a JPEG, so v1.4 also
+// checks the magic signature of the bytes before copying, refusing to
+// build from anything that is not a JPEG or PNG image.
 // Node 22+, standard library only.
 
 import {
@@ -21,6 +24,34 @@ const IMAGE_FILE = "entry.png";
 // see at a glance that the file written out is the file that went in.
 function fingerprint(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
+}
+
+// The artwork file is named entry.png but its bytes are a JPEG, so the
+// name alone proves nothing. Check the first bytes against the magic
+// signatures of the two image formats this entry can ever be — JPEG
+// (FF D8 FF) and PNG (89 50 4E 47 0D 0A 1A 0A) — and refuse to build from
+// anything else, so a misplaced text or data file fails here with a
+// plain message instead of being handed to the judge as an image.
+function imageFormat(data: Buffer): string {
+  if (
+    data.length >= 3 &&
+    data[0] === 0xff &&
+    data[1] === 0xd8 &&
+    data[2] === 0xff
+  ) {
+    return "JPEG";
+  }
+  const pngMagic = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+  if (data.length >= 8 && data.subarray(0, 8).equals(pngMagic)) {
+    return "PNG";
+  }
+  const head = data.subarray(0, 8).toString("hex");
+  throw new Error(
+    `cannot build the entry: ${IMAGE_FILE} is not a JPEG or PNG image ` +
+      `(first bytes ${head || "none"})`,
+  );
 }
 
 // Read the artwork after proving it is really there and really has
@@ -50,6 +81,7 @@ function loadArtwork(source: URL): Buffer {
         `(${bytes.length} bytes read, ${info.size} expected)`,
     );
   }
+  imageFormat(bytes);
   return bytes;
 }
 
@@ -98,10 +130,11 @@ function placeVerified(artwork: Buffer, outDir: string): string {
 function main(): void {
   const source = new URL(`./${IMAGE_FILE}`, import.meta.url);
   const artwork = loadArtwork(source);
+  const format = imageFormat(artwork);
   const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
   const dest = placeVerified(artwork, outDir);
   console.log(
-    `wrote ${dest} (${artwork.length} bytes, sha256 ${fingerprint(artwork)}…, verified identical)`,
+    `wrote ${dest} (${format}, ${artwork.length} bytes, sha256 ${fingerprint(artwork)}…, verified identical)`,
   );
   const writtenSize = statSync(dest).size;
   console.log(
