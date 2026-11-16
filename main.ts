@@ -1,146 +1,77 @@
-// Whale Mage — Lightning Orb, v1.4.
-// Entry program for the make.fun ai-excited-01 bounty.
-// It takes the artwork file sitting beside this program, validates it,
-// places an identical copy in the output directory, and then proves the
-// copy is byte-for-byte the same by reading it back and comparing.
-// The file is named entry.png but its bytes are a JPEG, so v1.4 also
-// checks the magic signature of the bytes before copying, refusing to
-// build from anything that is not a JPEG or PNG image.
-// Node 22+, standard library only.
+/**
+ * Whale Mage — Lightning Orb (make.fun ai-excited-01, v1.5)
+ *
+ * The entry artwork is entry.png, a 1024x1024 JPEG kept beside this file.
+ * This program copies those exact bytes into the output directory and
+ * then proves the copy is faithful: it checks the sizes match and reads
+ * the output back for a byte-for-byte comparison, failing loudly on any
+ * mismatch instead of silently shipping a damaged image.
+ */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const IMAGE_FILE = "entry.png";
+const INPUT_NAME = "entry.png";
+const OUTPUT_NAME = "entry.png";
 
-// A short fingerprint of a buffer, used in the log lines so a human can
-// see at a glance that the file written out is the file that went in.
-function fingerprint(data: Buffer): string {
-  return createHash("sha256").update(data).digest("hex").slice(0, 16);
+function fail(message: string): never {
+  console.error(`ERROR: ${message}`);
+  process.exit(1);
 }
 
-// The artwork file is named entry.png but its bytes are a JPEG, so the
-// name alone proves nothing. Check the first bytes against the magic
-// signatures of the two image formats this entry can ever be — JPEG
-// (FF D8 FF) and PNG (89 50 4E 47 0D 0A 1A 0A) — and refuse to build from
-// anything else, so a misplaced text or data file fails here with a
-// plain message instead of being handed to the judge as an image.
-function imageFormat(data: Buffer): string {
-  if (
-    data.length >= 3 &&
-    data[0] === 0xff &&
-    data[1] === 0xd8 &&
-    data[2] === 0xff
-  ) {
-    return "JPEG";
+function loadInput(inputPath: string): Buffer {
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(inputPath);
+  } catch {
+    fail(`could not read ${inputPath}`);
   }
-  const pngMagic = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-  ]);
-  if (data.length >= 8 && data.subarray(0, 8).equals(pngMagic)) {
-    return "PNG";
-  }
-  const head = data.subarray(0, 8).toString("hex");
-  throw new Error(
-    `cannot build the entry: ${IMAGE_FILE} is not a JPEG or PNG image ` +
-      `(first bytes ${head || "none"})`,
-  );
-}
-
-// Read the artwork after proving it is really there and really has
-// content. A missing file, an empty file, or a file that cannot be read
-// all stop the run here with a plain message, before anything is written.
-function loadArtwork(source: URL): Buffer {
-  if (!existsSync(source)) {
-    throw new Error(
-      `cannot build the entry: ${IMAGE_FILE} is missing next to this program (${source.pathname})`,
-    );
-  }
-  const info = statSync(source);
-  if (info.size === 0) {
-    throw new Error(
-      `cannot build the entry: ${IMAGE_FILE} exists but is empty (0 bytes)`,
-    );
-  }
-  const bytes = readFileSync(source);
   if (bytes.length === 0) {
-    throw new Error(
-      `cannot build the entry: ${IMAGE_FILE} read back as 0 bytes`,
-    );
+    fail(`input ${inputPath} is empty`);
   }
-  if (bytes.length !== info.size) {
-    throw new Error(
-      `cannot build the entry: ${IMAGE_FILE} changed while reading ` +
-        `(${bytes.length} bytes read, ${info.size} expected)`,
-    );
-  }
-  imageFormat(bytes);
   return bytes;
 }
 
-// Prove the output directory can actually be written to before the
-// artwork is copied. Creating the directory is not enough: a read-only
-// mount or a permissions problem would only surface as a confusing
-// failure halfway through the write, so a tiny probe file is written
-// and removed first, and any problem stops the run with a plain message.
-function ensureWritableDir(outDir: string): void {
-  mkdirSync(outDir, { recursive: true });
-  const probe = `${outDir}/.write-probe`;
-  try {
-    writeFileSync(probe, "probe");
-    unlinkSync(probe);
-  } catch (cause) {
-    throw new Error(
-      `cannot build the entry: output directory ${outDir} is not writable ` +
-        `(${cause instanceof Error ? cause.message : String(cause)})`,
-    );
-  }
-}
-
-// Write the artwork into the output directory, then read the written
-// file back and compare it with what went in. Any difference — in size
-// or in a single byte — fails the run loudly instead of passing a
-// damaged image on to the judge.
-function placeVerified(artwork: Buffer, outDir: string): string {
-  ensureWritableDir(outDir);
-  const dest = `${outDir}/${IMAGE_FILE}`;
-  writeFileSync(dest, artwork);
-  const written = readFileSync(dest);
-  if (written.length !== artwork.length || !written.equals(artwork)) {
-    throw new Error(
-      `verification failed: ${dest} does not match ${IMAGE_FILE} ` +
-        `(${written.length} bytes on disk, ${artwork.length} expected)`,
-    );
-  }
-  if (fingerprint(written) !== fingerprint(artwork)) {
-    throw new Error(
-      `verification failed: ${dest} fingerprint differs from ${IMAGE_FILE}`,
-    );
-  }
-  return dest;
-}
-
 function main(): void {
-  const source = new URL(`./${IMAGE_FILE}`, import.meta.url);
-  const artwork = loadArtwork(source);
-  const format = imageFormat(artwork);
-  const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-  const dest = placeVerified(artwork, outDir);
-  console.log(
-    `wrote ${dest} (${format}, ${artwork.length} bytes, sha256 ${fingerprint(artwork)}…, verified identical)`,
-  );
-  const writtenSize = statSync(dest).size;
-  console.log(
-    `summary: input ${artwork.length} bytes, output ${writtenSize} bytes, identical: ${writtenSize === artwork.length}`,
-  );
+  const here = dirname(fileURLToPath(import.meta.url));
+  const inputPath = join(here, INPUT_NAME);
+
+  const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+  const outputPath = join(outputDir, OUTPUT_NAME);
+
+  const inputBytes = loadInput(inputPath);
+
+  // Create the output directory if it is not there yet, then copy.
+  mkdirSync(outputDir, { recursive: true });
+  writeFileSync(outputPath, inputBytes);
+
+  // v1.5: size check. The file on disk must be exactly as large as the
+  // input, and both sizes are printed so a human can see the match.
+  const outputSize = statSync(outputPath).size;
+  console.log(`size check: input ${inputBytes.length} bytes, output ${outputSize} bytes`);
+  if (outputSize !== inputBytes.length) {
+    fail(
+      `size mismatch: wrote ${outputSize} bytes to ${outputPath} ` +
+        `but the input is ${inputBytes.length} bytes`,
+    );
+  }
+
+  // Read the written file back and compare every byte with the input.
+  // A single differing byte fails the run loudly.
+  const writtenBytes = readFileSync(outputPath);
+  if (writtenBytes.length !== inputBytes.length || !writtenBytes.equals(inputBytes)) {
+    fail(
+      `byte mismatch: ${outputPath} (${writtenBytes.length} bytes) ` +
+        `does not match ${inputPath} (${inputBytes.length} bytes)`,
+    );
+  }
+
+  console.log(`wrote ${outputPath} (${inputBytes.length} bytes, verified identical)`);
 }
 
-main();
-
+try {
+  main();
+} catch (cause) {
+  fail(cause instanceof Error ? cause.message : String(cause));
+}

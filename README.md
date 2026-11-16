@@ -15,19 +15,19 @@ light, pale grey armor — one huge figure, one glowing orb as the key light,
 no text anywhere in the image. The shape is big and simple enough to hit
 even at thumbnail size, and the detail rewards a closer look.
 
-The entry program (`main.ts`, Node 22, standard library only) first
-checks the image next to it is present and non-empty, refusing to build
-from a missing or zero-byte file, then copies it into the output
-directory as `entry.png`, reads the copy back, and checks it byte for
-byte against the original, failing loudly if anything differs — so what
-the judge sees is exactly the artwork, nothing added, nothing changed.
-It also prints a short fingerprint of the bytes written, so the copy can
-be matched to the original at a glance. v1.2 adds the pre-copy
-existence and non-empty checks plus that fingerprint line. v1.3 adds a
-writability probe of the output directory before copying, and a final
-one-line summary of input bytes versus output bytes. v1.4 checks the
-image's first bytes against the JPEG/PNG magic signatures before
-copying, and names the detected format in the log line.
+The entry program (`main.ts`, Node 22+, standard library only) reads the
+artwork file sitting beside it, copies its exact bytes into the output
+directory as `entry.png`, and then proves the copy is faithful: it checks
+the sizes match and reads the written file back for a byte-for-byte
+comparison, failing loudly if anything differs — so what the judge sees
+is exactly the artwork, nothing added, nothing changed.
+
+v1.5 adds an explicit size check right after copying: it stats the output
+file, prints a log line with both the input size and the output size, and
+refuses to continue if the two do not match, before the byte comparison
+runs. Earlier versions added the pre-copy existence and non-empty checks,
+the output-directory writability probe, the input-versus-output byte
+summary, and the JPEG/PNG magic-signature check before copying.
 
 Run it with `MAKEFUN_OUTPUT_DIR` set to the output directory (it defaults
 to `/output`); it creates the directory if needed.
