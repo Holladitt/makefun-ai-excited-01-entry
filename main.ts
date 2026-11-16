@@ -1,4 +1,4 @@
-// Whale Mage — Lightning Orb, v1.2.
+// Whale Mage — Lightning Orb, v1.3.
 // Entry program for the make.fun ai-excited-01 bounty.
 // It takes the artwork file sitting beside this program, validates it,
 // places an identical copy in the output directory, and then proves the
@@ -10,6 +10,7 @@ import {
   mkdirSync,
   readFileSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
@@ -52,12 +53,31 @@ function loadArtwork(source: URL): Buffer {
   return bytes;
 }
 
+// Prove the output directory can actually be written to before the
+// artwork is copied. Creating the directory is not enough: a read-only
+// mount or a permissions problem would only surface as a confusing
+// failure halfway through the write, so a tiny probe file is written
+// and removed first, and any problem stops the run with a plain message.
+function ensureWritableDir(outDir: string): void {
+  mkdirSync(outDir, { recursive: true });
+  const probe = `${outDir}/.write-probe`;
+  try {
+    writeFileSync(probe, "probe");
+    unlinkSync(probe);
+  } catch (cause) {
+    throw new Error(
+      `cannot build the entry: output directory ${outDir} is not writable ` +
+        `(${cause instanceof Error ? cause.message : String(cause)})`,
+    );
+  }
+}
+
 // Write the artwork into the output directory, then read the written
 // file back and compare it with what went in. Any difference — in size
 // or in a single byte — fails the run loudly instead of passing a
 // damaged image on to the judge.
 function placeVerified(artwork: Buffer, outDir: string): string {
-  mkdirSync(outDir, { recursive: true });
+  ensureWritableDir(outDir);
   const dest = `${outDir}/${IMAGE_FILE}`;
   writeFileSync(dest, artwork);
   const written = readFileSync(dest);
@@ -82,6 +102,10 @@ function main(): void {
   const dest = placeVerified(artwork, outDir);
   console.log(
     `wrote ${dest} (${artwork.length} bytes, sha256 ${fingerprint(artwork)}…, verified identical)`,
+  );
+  const writtenSize = statSync(dest).size;
+  console.log(
+    `summary: input ${artwork.length} bytes, output ${writtenSize} bytes, identical: ${writtenSize === artwork.length}`,
   );
 }
 

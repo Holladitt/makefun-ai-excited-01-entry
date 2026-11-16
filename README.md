@@ -23,7 +23,9 @@ byte against the original, failing loudly if anything differs — so what
 the judge sees is exactly the artwork, nothing added, nothing changed.
 It also prints a short fingerprint of the bytes written, so the copy can
 be matched to the original at a glance. v1.2 adds the pre-copy
-existence and non-empty checks plus that fingerprint line.
+existence and non-empty checks plus that fingerprint line. v1.3 adds a
+writability probe of the output directory before copying, and a final
+one-line summary of input bytes versus output bytes.
 
 Run it with `MAKEFUN_OUTPUT_DIR` set to the output directory (it defaults
 to `/output`); it creates the directory if needed.
