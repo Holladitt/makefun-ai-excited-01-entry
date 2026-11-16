@@ -15,11 +15,15 @@ light, pale grey armor — one huge figure, one glowing orb as the key light,
 no text anywhere in the image. The shape is big and simple enough to hit
 even at thumbnail size, and the detail rewards a closer look.
 
-The entry program (`main.ts`, Node 22, standard library only) copies the
-image next to it into the output directory as `entry.png`, then reads the
-copy back and checks it byte for byte against the original, failing loudly
-if anything differs — so what the judge sees is exactly the artwork,
-nothing added, nothing changed.
+The entry program (`main.ts`, Node 22, standard library only) first
+checks the image next to it is present and non-empty, refusing to build
+from a missing or zero-byte file, then copies it into the output
+directory as `entry.png`, reads the copy back, and checks it byte for
+byte against the original, failing loudly if anything differs — so what
+the judge sees is exactly the artwork, nothing added, nothing changed.
+It also prints a short fingerprint of the bytes written, so the copy can
+be matched to the original at a glance. v1.2 adds the pre-copy
+existence and non-empty checks plus that fingerprint line.
 
 Run it with `MAKEFUN_OUTPUT_DIR` set to the output directory (it defaults
 to `/output`); it creates the directory if needed.
