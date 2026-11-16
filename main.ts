@@ -1,77 +1,54 @@
-/**
- * Whale Mage — Lightning Orb (make.fun ai-excited-01, v1.5)
- *
- * The entry artwork is entry.png, a 1024x1024 JPEG kept beside this file.
- * This program copies those exact bytes into the output directory and
- * then proves the copy is faithful: it checks the sizes match and reads
- * the output back for a byte-for-byte comparison, failing loudly on any
- * mismatch instead of silently shipping a damaged image.
- */
-
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const INPUT_NAME = "entry.png";
-const OUTPUT_NAME = "entry.png";
+// Whale Mage — Lightning Orb, v1.6.
+// Copies entry.png byte-for-byte into the make.fun output directory and
+// verifies the copy by reading it back before reporting success.
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const IMAGE_NAME = "entry.png";
 
 function fail(message: string): never {
-  console.error(`ERROR: ${message}`);
+  console.error(`whale-mage v1.6: ERROR: ${message}`);
   process.exit(1);
 }
 
-function loadInput(inputPath: string): Buffer {
-  let bytes: Buffer;
-  try {
-    bytes = readFileSync(inputPath);
-  } catch {
-    fail(`could not read ${inputPath}`);
-  }
-  if (bytes.length === 0) {
-    fail(`input ${inputPath} is empty`);
-  }
-  return bytes;
-}
-
 function main(): void {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const inputPath = join(here, INPUT_NAME);
-
-  const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-  const outputPath = join(outputDir, OUTPUT_NAME);
-
-  const inputBytes = loadInput(inputPath);
-
-  // Create the output directory if it is not there yet, then copy.
-  mkdirSync(outputDir, { recursive: true });
-  writeFileSync(outputPath, inputBytes);
-
-  // v1.5: size check. The file on disk must be exactly as large as the
-  // input, and both sizes are printed so a human can see the match.
-  const outputSize = statSync(outputPath).size;
-  console.log(`size check: input ${inputBytes.length} bytes, output ${outputSize} bytes`);
-  if (outputSize !== inputBytes.length) {
-    fail(
-      `size mismatch: wrote ${outputSize} bytes to ${outputPath} ` +
-        `but the input is ${inputBytes.length} bytes`,
-    );
+  const sourcePath = join(HERE, IMAGE_NAME);
+  if (!existsSync(sourcePath)) {
+    fail(`source image not found beside main.ts: ${sourcePath}`);
+  }
+  const sourceBytes = readFileSync(sourcePath);
+  if (sourceBytes.length === 0) {
+    fail(`source image is empty: ${sourcePath}`);
   }
 
-  // Read the written file back and compare every byte with the input.
-  // A single differing byte fails the run loudly.
-  const writtenBytes = readFileSync(outputPath);
-  if (writtenBytes.length !== inputBytes.length || !writtenBytes.equals(inputBytes)) {
-    fail(
-      `byte mismatch: ${outputPath} (${writtenBytes.length} bytes) ` +
-        `does not match ${inputPath} (${inputBytes.length} bytes)`,
-    );
+  const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
+  mkdirSync(outDir, { recursive: true });
+  const outPath = join(outDir, IMAGE_NAME);
+  writeFileSync(outPath, sourceBytes);
+
+  verifyCopy(sourcePath, outPath, sourceBytes);
+}
+
+function verifyCopy(sourcePath: string, outPath: string, sourceBytes: Buffer): void {
+  // v1.6: confirm the output file exists and can be re-read, then compare
+  // every byte against the source before declaring the copy good.
+  if (!existsSync(outPath)) {
+    fail(`output file missing after copy: ${outPath}`);
   }
-
-  console.log(`wrote ${outputPath} (${inputBytes.length} bytes, verified identical)`);
+  const outStat = statSync(outPath);
+  if (!outStat.isFile()) {
+    fail(`output path is not a regular file: ${outPath}`);
+  }
+  const outBytes = readFileSync(outPath);
+  if (!outBytes.equals(sourceBytes)) {
+    fail(`byte mismatch: output ${outPath} differs from source ${sourcePath}`);
+  }
+  console.log(
+    `whale-mage v1.6: wrote ${outPath} (source ${sourceBytes.length} bytes, output ${outBytes.length} bytes) — verified identical`,
+  );
 }
 
-try {
-  main();
-} catch (cause) {
-  fail(cause instanceof Error ? cause.message : String(cause));
-}
+main();
