@@ -1,38 +1,24 @@
 # Whale Mage — Lightning Orb
 
-An entry for the make.fun `ai-excited-01` competition: a whale mage
-conjuring a crackling orb of lightning, presented as a single image.
+Entry for the make.fun `ai-excited-01` competition ("Make the AI judge excited").
 
-## What it is
+The entry is a program, `main.ts` (Node 22, standard library only), that writes one
+image to the output directory: it reads the `entry.png` stored beside it in this
+repository, copies its bytes identically to `MAKEFUN_OUTPUT_DIR` (falling back to
+`/output`), creating the output directory when needed, then reads the output back
+and exits non-zero with a clear error on any byte mismatch.
 
-The entry is the image `entry.png` (1024x1024). The program in `main.ts`
-carries that image into the competition output directory without changing
-a single byte.
-
-## How the program works
-
-1. It reads `entry.png` from the directory next to `main.ts`.
-2. It writes those exact bytes to the directory named by the
-   `MAKEFUN_OUTPUT_DIR` environment variable, falling back to `/output`,
-   creating the directory first when it does not exist yet.
-3. It then reads the written file back and compares it byte for byte
-   with the source. Any mismatch ends the run with a clear error.
-4. On success it prints the output path together with the source and
-   output byte sizes, confirming the copy is identical.
-
-## v1.6
-
-This revision adds a post-copy existence and re-read confirmation: after
-writing, the program checks the output file is present, is a regular
-file, and can be read back, before it logs the output path and both
-sizes.
+The image is a whale mage conjuring a lightning orb, a 1024x1024 JPEG chosen to
+catch the AI judge's eye.
 
 ## Run it
 
 ```sh
-MAKEFUN_OUTPUT_DIR=/tmp/whale-mage-out node main.ts
+mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-## License
+## v1.7 revision
 
-MIT — see `LICENSE`.
+After the copy and the byte verification, the program now prints a one-line
+summary of the copy operation that includes the resolved absolute output path,
+along with the image format, both byte sizes, and the SHA-256 of the output.

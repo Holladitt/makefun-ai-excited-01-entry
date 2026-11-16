@@ -1,54 +1,42 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Whale Mage — Lightning Orb, v1.6.
-// Copies entry.png byte-for-byte into the make.fun output directory and
-// verifies the copy by reading it back before reporting success.
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const IMAGE_NAME = "entry.png";
-
 function fail(message: string): never {
-  console.error(`whale-mage v1.6: ERROR: ${message}`);
+  console.error(`error: ${message}`);
   process.exit(1);
 }
 
-function main(): void {
-  const sourcePath = join(HERE, IMAGE_NAME);
-  if (!existsSync(sourcePath)) {
-    fail(`source image not found beside main.ts: ${sourcePath}`);
-  }
-  const sourceBytes = readFileSync(sourcePath);
-  if (sourceBytes.length === 0) {
-    fail(`source image is empty: ${sourcePath}`);
-  }
+const sourcePath = join(dirname(fileURLToPath(import.meta.url)), "entry.png");
+const outputDir = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? "/output");
+const outputPath = join(outputDir, "entry.png");
 
-  const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
-  mkdirSync(outDir, { recursive: true });
-  const outPath = join(outDir, IMAGE_NAME);
-  writeFileSync(outPath, sourceBytes);
-
-  verifyCopy(sourcePath, outPath, sourceBytes);
+let source: Buffer;
+try {
+  source = readFileSync(sourcePath);
+} catch {
+  fail(`cannot read source image at ${sourcePath}`);
 }
 
-function verifyCopy(sourcePath: string, outPath: string, sourceBytes: Buffer): void {
-  // v1.6: confirm the output file exists and can be re-read, then compare
-  // every byte against the source before declaring the copy good.
-  if (!existsSync(outPath)) {
-    fail(`output file missing after copy: ${outPath}`);
-  }
-  const outStat = statSync(outPath);
-  if (!outStat.isFile()) {
-    fail(`output path is not a regular file: ${outPath}`);
-  }
-  const outBytes = readFileSync(outPath);
-  if (!outBytes.equals(sourceBytes)) {
-    fail(`byte mismatch: output ${outPath} differs from source ${sourcePath}`);
-  }
-  console.log(
-    `whale-mage v1.6: wrote ${outPath} (source ${sourceBytes.length} bytes, output ${outBytes.length} bytes) — verified identical`,
-  );
-}
+const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const jpegMagic = Buffer.from([0xff, 0xd8, 0xff]);
+let format = "unknown";
+if (source.subarray(0, 8).equals(pngMagic)) format = "PNG";
+else if (source.subarray(0, 3).equals(jpegMagic)) format = "JPEG";
+if (format === "unknown") fail(`source image at ${sourcePath} is neither PNG nor JPEG`);
 
-main();
+mkdirSync(outputDir, { recursive: true });
+writeFileSync(outputPath, source);
+
+if (!existsSync(outputPath)) fail(`output missing after copy: ${outputPath}`);
+const copiedSize = statSync(outputPath).size;
+if (copiedSize !== source.length) {
+  fail(`size mismatch after copy: source ${source.length} bytes, output ${copiedSize} bytes`);
+}
+const copied = readFileSync(outputPath);
+if (!copied.equals(source)) {
+  fail(`byte mismatch after copy: ${outputPath} differs from ${sourcePath}`);
+}
+const digest = createHash("sha256").update(copied).digest("hex");
+console.log(`copied ${format} image: ${source.length} bytes -> ${copiedSize} bytes, sha256 ${digest}, output ${outputPath}`);
