@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function fail(message: string): never {
@@ -11,6 +11,15 @@ function fail(message: string): never {
 const sourcePath = join(dirname(fileURLToPath(import.meta.url)), "entry.png");
 const outputDir = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? "/output");
 const outputPath = join(outputDir, "entry.png");
+
+// Guard: the resolved output path must stay inside the resolved output
+// directory, so a surprising MAKEFUN_OUTPUT_DIR value can never make the
+// program write outside the intended output folder.
+const resolvedOutput = resolve(outputPath);
+const resolvedDir = resolve(outputDir);
+if (!resolvedOutput.startsWith(resolvedDir + sep)) {
+  fail(`output path escapes output directory: ${resolvedOutput} is not inside ${resolvedDir}`);
+}
 
 let source: Buffer;
 try {

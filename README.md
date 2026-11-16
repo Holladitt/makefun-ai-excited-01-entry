@@ -17,6 +17,12 @@ catch the AI judge's eye.
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
+## v1.8 revision
+
+Before writing, the program now resolves both the output path and the output
+directory and verifies the output path stays inside that directory, failing
+with a clear error if it ever escapes it.
+
 ## v1.7 revision
 
 After the copy and the byte verification, the program now prints a one-line
