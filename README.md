@@ -17,6 +17,14 @@ catch the AI judge's eye.
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
+## v1.8-rev2 revision
+
+Before copying, the program now rejects an empty source image and records the
+source SHA-256 up front; after creating the output directory it verifies the
+output file's parent directory exists, and after the byte verification it
+re-checks the copied bytes' image format against the source format. The
+summary line now prints both the source and the output SHA-256 hashes.
+
 ## v1.8 revision
 
 Before writing, the program now resolves both the output path and the output

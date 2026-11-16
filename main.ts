@@ -34,8 +34,14 @@ let format = "unknown";
 if (source.subarray(0, 8).equals(pngMagic)) format = "PNG";
 else if (source.subarray(0, 3).equals(jpegMagic)) format = "JPEG";
 if (format === "unknown") fail(`source image at ${sourcePath} is neither PNG nor JPEG`);
+if (source.length === 0) fail(`source image at ${sourcePath} is empty`);
+const sourceDigest = createHash("sha256").update(source).digest("hex");
 
 mkdirSync(outputDir, { recursive: true });
+const parentDir = dirname(resolvedOutput);
+if (!existsSync(parentDir) || !statSync(parentDir).isDirectory()) {
+  fail(`output parent directory missing after create: ${parentDir}`);
+}
 writeFileSync(outputPath, source);
 
 if (!existsSync(outputPath)) fail(`output missing after copy: ${outputPath}`);
@@ -47,5 +53,13 @@ const copied = readFileSync(outputPath);
 if (!copied.equals(source)) {
   fail(`byte mismatch after copy: ${outputPath} differs from ${sourcePath}`);
 }
-const digest = createHash("sha256").update(copied).digest("hex");
-console.log(`copied ${format} image: ${source.length} bytes -> ${copiedSize} bytes, sha256 ${digest}, output ${outputPath}`);
+const copiedFormat = copied.subarray(0, 8).equals(pngMagic)
+  ? "PNG"
+  : copied.subarray(0, 3).equals(jpegMagic)
+    ? "JPEG"
+    : "unknown";
+if (copiedFormat !== format) {
+  fail(`format mismatch after copy: source is ${format}, output is ${copiedFormat}`);
+}
+const outputDigest = createHash("sha256").update(copied).digest("hex");
+console.log(`copied ${format} image: ${source.length} bytes -> ${copiedSize} bytes, source sha256 ${sourceDigest}, output sha256 ${outputDigest}, output ${outputPath}`);
